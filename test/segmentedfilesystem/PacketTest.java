@@ -9,7 +9,7 @@ import org.junit.Test;
  * something meaningful in your context and populate it with
  * useful tests.
  */
-public class DummyTest {
+public class PacketTest {
 
     @Test
     public void test() {
