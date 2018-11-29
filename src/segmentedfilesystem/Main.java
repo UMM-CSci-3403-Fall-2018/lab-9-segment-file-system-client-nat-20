@@ -1,31 +1,115 @@
 package segmentedfilesystem;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.*;
+import java.util.HashMap;
+import java.util.Iterator;
 
 public class Main {
     
     public static void main(String[] args) {
-        int port = 4556;
+        int port = 4445;
         InetAddress address;
         DatagramSocket socket = null;
         DatagramPacket packet;
-        byte[] sendBuf = new byte[256];
+        byte[] buf = new byte[1028]; // 1KB + 4 bytes for the header
 
         if (args.length != 1) {
             System.out.println("Usage: java Main <hostname>");
             return;
         }
 
+        // open the socket
         try {
             socket = new DatagramSocket();
+        } catch (SocketException e) {
+            System.err.println("Failed to open socket\n" + e);
+        }
+
+        try {
+            // send an empty packet to "start the conversation"
             address = InetAddress.getByName(args[0]);
-            packet = new DatagramPacket(sendBuf, sendBuf.length, address, port);
+            packet = new DatagramPacket(buf, buf.length, address, port);
             socket.send(packet);
-        } catch (Exception e) {
-            System.err.println("Failed to connect with server\n" + e);
+        } catch (IOException e) {
+            System.err.println("Failed to send header packet to server\n" + e);
+            return;
+        }
+
+        // map containing the file objects
+        HashMap<Byte, ReceivedFile> files = new HashMap<>();
+
+        // receive packets
+        while(true) {
+            packet = new DatagramPacket(buf, buf.length);
+            try {
+                socket.receive(packet);
+            } catch (IOException e) {
+                System.err.println("Error when receiving packets\n" + e);
+                return;
+            }
+            byte fileId = buf[1];
+            // if this file is new, add it to the map
+            if(files.get(fileId)==null) {
+                files.put(fileId, new ReceivedFile(packet));
+            } else {
+                files.get(fileId).addPacket(packet);
+            }
+
+            Iterator<ReceivedFile> it = files.values().iterator();
         }
 
 
     }
 
+}
+class ReceivedFile {
+    // -1 is the header packet, other numbers are the data for the file
+    HashMap<Integer, DatagramPacket> packets;
+    private byte fileId;
+    private int numPackets;
+    private int foundPackets;
+    private boolean done;
+
+    // create the object using a packet
+    public ReceivedFile(DatagramPacket packet) {
+        fileId = packet.getData()[1];
+        numPackets = Integer.MAX_VALUE; // set this to max value until we know the length for sure
+        foundPackets = 0;
+        done = false;
+
+        this.addPacket(packet);
+    }
+
+    public void addPacket(DatagramPacket packet) {
+        switch (packet.getData()[0] % 4) { // use the status byte mod 4 to figure out what kind of packet we have
+            case 3: {
+                //convert the packet number from bytes to an int so we can get the total number of packets
+                numPackets = ((packet.getData()[2] & 0xff) << 8) | (packet.getData()[3] & 0xff) + 2;
+            }
+            case 1: {
+                int packetNumber = ((packet.getData()[2] & 0xff) << 8) | (packet.getData()[3] & 0xff);
+                packets.put(packetNumber, packet);
+                break;
+            }
+            default: { // if it is 0 or 2 it is a header packet
+
+            }
+        }
+        if(numPackets-foundPackets==0) {
+            done = true;
+        }
+        System.out.println(packet.getData()[2]);
+
+    }
+
+    public boolean isDone() {
+        return done;
+    }
+
+    // if all packets have been received, build the file
+    public File createFile() {
+        return null;
+    }
 }
