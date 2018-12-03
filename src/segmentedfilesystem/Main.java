@@ -1,6 +1,7 @@
 package segmentedfilesystem;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.*;
 import java.util.ArrayList;
@@ -75,7 +76,12 @@ public class Main {
 
         // Create all of the files
         for(ReceivedFile file: doneFiles) {
-            file.createFile();
+            try {
+                file.createFile();
+            } catch (IOException e) {
+                System.err.println("Error when creating file\n" + e);
+            }
+
         }
 
 
@@ -131,7 +137,31 @@ class ReceivedFile {
     }
 
     // if all packets have been received, build the file
-    public File createFile() {
-        return null;
+    public void createFile() throws IOException{
+        DatagramPacket header = packets.get(-1);
+        String fileName = "";
+
+        for(int i = 2; i < header.getLength(); i++) {
+            fileName = fileName + (char)header.getData()[i];
+        }
+        System.out.println(fileName);
+
+        File newFile = new File(fileName);
+        FileWriter writer = new FileWriter(newFile);
+
+        if(!newFile.createNewFile()) {
+            System.out.println("File already exists.");
+        }
+
+        // loop through the data packets
+        for(int j = 0; j < numPackets - 1; j++) {
+            DatagramPacket packet = packets.get(j);
+            //print the data from the packet into the file
+            for(int i = 4; i < packet.getLength(); i++) {
+                writer.write(packet.getData()[i]);
+            }
+        }
+
+        writer.close();
     }
 }
