@@ -3,13 +3,14 @@ package segmentedfilesystem;
 import java.io.File;
 import java.io.IOException;
 import java.net.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 
 public class Main {
     
     public static void main(String[] args) {
-        int port = 4445;
+        int port = 6014;
         InetAddress address;
         DatagramSocket socket = null;
         DatagramPacket packet;
@@ -40,6 +41,8 @@ public class Main {
         // map containing the file objects
         HashMap<Byte, ReceivedFile> files = new HashMap<>();
 
+        ArrayList<ReceivedFile> doneFiles = new ArrayList<>();
+
         // receive packets
         while(true) {
             packet = new DatagramPacket(buf, buf.length);
@@ -57,7 +60,22 @@ public class Main {
                 files.get(fileId).addPacket(packet);
             }
 
-            Iterator<ReceivedFile> it = files.values().iterator();
+            //if the file is done, move it to the done pile
+            if(files.get(fileId).isDone()) {
+                System.out.println("One file is done");
+                doneFiles.add(files.remove(fileId));
+                // if all the files are done, break out of the loop
+                if(files.isEmpty()) {
+                    System.out.println("Done");
+                    break;
+                }
+            }
+
+        }
+
+        // Create all of the files
+        for(ReceivedFile file: doneFiles) {
+            file.createFile();
         }
 
 
@@ -78,29 +96,33 @@ class ReceivedFile {
         numPackets = Integer.MAX_VALUE; // set this to max value until we know the length for sure
         foundPackets = 0;
         done = false;
+        packets = new HashMap<>();
 
         this.addPacket(packet);
     }
 
     public void addPacket(DatagramPacket packet) {
+        foundPackets++;
         switch (packet.getData()[0] % 4) { // use the status byte mod 4 to figure out what kind of packet we have
             case 3: {
                 //convert the packet number from bytes to an int so we can get the total number of packets
                 numPackets = ((packet.getData()[2] & 0xff) << 8) | (packet.getData()[3] & 0xff) + 2;
+                System.out.println("numPackets: " + numPackets);
             }
             case 1: {
+                // if it's the last packet, we can get the packet length
                 int packetNumber = ((packet.getData()[2] & 0xff) << 8) | (packet.getData()[3] & 0xff);
                 packets.put(packetNumber, packet);
                 break;
             }
             default: { // if it is 0 or 2 it is a header packet
-
+                packets.put(-1,packet);
             }
         }
-        if(numPackets-foundPackets==0) {
+        if(numPackets==foundPackets) {
             done = true;
         }
-        System.out.println(packet.getData()[2]);
+//        System.out.println(packet.getData()[2]);
 
     }
 
