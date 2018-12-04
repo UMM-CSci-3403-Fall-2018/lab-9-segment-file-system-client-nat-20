@@ -90,7 +90,7 @@ public class Main {
 class ReceivedFile {
     // -1 is the header packet, other numbers are the data for the file
     public HashMap<Integer, byte[]> packets; // made public for testing purposes
-    private int numPackets;
+    public int numPackets; // made public for testing purposes
     private int foundPackets;
     private boolean done;
 
@@ -107,13 +107,13 @@ class ReceivedFile {
     public void addPacket(DatagramPacket packet) {
         foundPackets++;
         switch (packet.getData()[0] % 4) { // use the status byte mod 4 to figure out what kind of packet we have
-            case 3: {
-                //convert the packet number from bytes to an int so we can get the total number of packets
+            case 3: { // if it is 3 it is the final packet
+                // convert the packet number from bytes to an int so we can get the total number of packets
                 numPackets = ((packet.getData()[2] & 0xff) << 8) | (packet.getData()[3] & 0xff) + 2;
                 System.out.println("numPackets: " + numPackets);
             }
             case 1: {
-                // if it's the last packet, we can get the packet length
+                // get the packet number
                 int packetNumber = ((packet.getData()[2] & 0xff) << 8) | (packet.getData()[3] & 0xff);
                 packets.put(packetNumber, Arrays.copyOf(packet.getData(), packet.getLength()));
                 break;
@@ -135,9 +135,7 @@ class ReceivedFile {
 
     // if all packets have been received, build the file
     public void createFile() throws IOException{
-        byte[] header = packets.get(-1);
-        String fileName = new String(header, 2, header.length-2);
-        System.out.println(fileName);
+        String fileName = getFileName();
 
         File newFile = new File(fileName);
         OutputStream writer = new FileOutputStream(newFile);
@@ -154,5 +152,10 @@ class ReceivedFile {
         }
 
         writer.close();
+    }
+
+    public String getFileName() {
+        byte[] header = packets.get(-1);
+        return new String(header, 2, header.length-2);
     }
 }
