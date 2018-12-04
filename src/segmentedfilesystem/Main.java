@@ -1,10 +1,9 @@
 package segmentedfilesystem;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 
@@ -90,15 +89,13 @@ public class Main {
 }
 class ReceivedFile {
     // -1 is the header packet, other numbers are the data for the file
-    HashMap<Integer, DatagramPacket> packets;
-    private byte fileId;
+    public HashMap<Integer, byte[]> packets; // made public for testing purposes
     private int numPackets;
     private int foundPackets;
     private boolean done;
 
     // create the object using a packet
     public ReceivedFile(DatagramPacket packet) {
-        fileId = packet.getData()[1];
         numPackets = Integer.MAX_VALUE; // set this to max value until we know the length for sure
         foundPackets = 0;
         done = false;
@@ -118,11 +115,11 @@ class ReceivedFile {
             case 1: {
                 // if it's the last packet, we can get the packet length
                 int packetNumber = ((packet.getData()[2] & 0xff) << 8) | (packet.getData()[3] & 0xff);
-                packets.put(packetNumber, packet);
+                packets.put(packetNumber, Arrays.copyOf(packet.getData(), packet.getLength()));
                 break;
             }
             default: { // if it is 0 or 2 it is a header packet
-                packets.put(-1,packet);
+                packets.put(-1, Arrays.copyOf(packet.getData(), packet.getLength()));
             }
         }
         if(numPackets==foundPackets) {
@@ -138,28 +135,22 @@ class ReceivedFile {
 
     // if all packets have been received, build the file
     public void createFile() throws IOException{
-        DatagramPacket header = packets.get(-1);
-        String fileName = "";
-
-        for(int i = 2; i < header.getLength(); i++) {
-            fileName = fileName + (char)header.getData()[i];
-        }
+        byte[] header = packets.get(-1);
+        String fileName = new String(header, 2, header.length-2);
         System.out.println(fileName);
 
         File newFile = new File(fileName);
-        FileWriter writer = new FileWriter(newFile);
+        OutputStream writer = new FileOutputStream(newFile);
 
-        if(!newFile.createNewFile()) {
+        if(newFile.createNewFile()) {
             System.out.println("File already exists.");
         }
 
         // loop through the data packets
         for(int j = 0; j < numPackets - 1; j++) {
-            DatagramPacket packet = packets.get(j);
-            //print the data from the packet into the file
-            for(int i = 4; i < packet.getLength(); i++) {
-                writer.write(packet.getData()[i]);
-            }
+            byte[] packet = packets.get(j);
+            //write the data from the packet into the file
+            writer.write(packet, 4, packet.length - 4);
         }
 
         writer.close();
