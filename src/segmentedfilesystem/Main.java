@@ -62,11 +62,9 @@ public class Main {
 
             //if the file is done, move it to the done pile
             if(files.get(fileId).isDone()) {
-                System.out.println("One file is done");
                 doneFiles.add(files.remove(fileId));
                 // if all the files are done, break out of the loop
                 if(files.isEmpty()) {
-                    System.out.println("Done");
                     break;
                 }
             }
@@ -110,7 +108,6 @@ class ReceivedFile {
             case 3: { // if it is 3 it is the final packet
                 // convert the packet number from bytes to an int so we can get the total number of packets
                 numPackets = ((packet.getData()[2] & 0xff) << 8) | (packet.getData()[3] & 0xff) + 2;
-                System.out.println("numPackets: " + numPackets);
             }
             case 1: {
                 // get the packet number
@@ -125,7 +122,6 @@ class ReceivedFile {
         if(numPackets==foundPackets) {
             done = true;
         }
-//        System.out.println(packet.getData()[2]);
 
     }
 
@@ -139,6 +135,7 @@ class ReceivedFile {
 
         File newFile = new File(fileName);
         OutputStream writer = new FileOutputStream(newFile);
+        System.out.println(fileName);
 
         if(newFile.createNewFile()) {
             System.out.println("File already exists.");
